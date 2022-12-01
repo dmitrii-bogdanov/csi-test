@@ -1,4 +1,4 @@
-package bogdanov.csi.test.validators;
+package bogdanov.csi.test.services.validators;
 
 import bogdanov.csi.test.dto.PriceDto;
 import bogdanov.csi.test.exceptions.price.*;
