@@ -26,8 +26,8 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
                 currentPrices);
         final Map<PricePlacement, List<PriceDto>> newPricesByPricePlacement = getPricesByPricePlacement(newPrices);
 
-        sortPrices(currentPricesByPricePlacement);
-        sortPrices(newPricesByPricePlacement);
+//        sortPrices(currentPricesByPricePlacement);
+//        sortPrices(newPricesByPricePlacement);
 
         final List<PriceDto> aggregatedPrices = aggregate(currentPricesByPricePlacement, newPricesByPricePlacement);
 

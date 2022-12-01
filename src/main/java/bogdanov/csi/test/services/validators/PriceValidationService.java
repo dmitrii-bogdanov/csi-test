@@ -2,6 +2,7 @@ package bogdanov.csi.test.services.validators;
 
 import bogdanov.csi.test.dto.PriceDto;
 import bogdanov.csi.test.exceptions.price.*;
+import org.apache.logging.log4j.util.Strings;
 
 public class PriceValidationService implements PriceValidationServiceInterface {
 
@@ -31,8 +32,8 @@ public class PriceValidationService implements PriceValidationServiceInterface {
     }
 
     private void checkProductCode(final PriceDto price) throws InvalidPriceProductCodeException {
-        if (price.getProductCode() == null) {
-            throw new InvalidPriceProductCodeException("Product code is null");
+        if (Strings.isBlank(price.getProductCode())) {
+            throw new InvalidPriceProductCodeException("Product code is null or blank");
         }
     }
 
