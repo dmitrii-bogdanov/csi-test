@@ -42,7 +42,7 @@ public class PriceValidationService implements PriceValidationServiceInterface {
         }
     }
 
-    private void checkDepart(final PriceDto price) {
+    private void checkDepart(final PriceDto price) throws InvalidPriceDepartException {
         if (price.getDepart() <= 0) {
             throw new InvalidPriceDepartException("Depart is not positive. Received: " + price.getDepart());
         }
