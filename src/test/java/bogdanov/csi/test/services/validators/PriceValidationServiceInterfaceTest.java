@@ -17,7 +17,7 @@ class PriceValidationServiceInterfaceTest {
 
     private PriceDto getDefaultPriceDto() {
         final PriceDto price = new PriceDto();
-        price.setId(1);
+        price.setId(1L);
         price.setProductCode("P1");
         price.setNumber(1);
         price.setDepart(1);
@@ -48,7 +48,7 @@ class PriceValidationServiceInterfaceTest {
     void checkNegativeId() {
 
         final PriceDto price = getDefaultPriceDto();
-        price.setId(-1);
+        price.setId(-1L);
 
         InvalidPriceException e = assertThrows(InvalidPriceException.class,
                                                () -> priceValidationService.validate(price));
@@ -59,7 +59,7 @@ class PriceValidationServiceInterfaceTest {
     void checkZeroId() {
 
         final PriceDto price = getDefaultPriceDto();
-        price.setId(0);
+        price.setId(0L);
 
         InvalidPriceException e = assertThrows(InvalidPriceException.class,
                                                () -> priceValidationService.validate(price));
@@ -119,6 +119,63 @@ class PriceValidationServiceInterfaceTest {
         InvalidPriceException e = assertThrows(InvalidPriceException.class,
                                                () -> priceValidationService.validate(price));
         assertEquals(InvalidPriceNumberException.class, e.getClass());
+    }
+
+    @Test
+    void checkNegativeDepart() {
+
+        final PriceDto price = getDefaultPriceDto();
+        price.setDepart(-1);
+
+        InvalidPriceException e = assertThrows(InvalidPriceException.class,
+                                               () -> priceValidationService.validate(price));
+        assertEquals(InvalidPriceDepartException.class, e.getClass());
+    }
+
+    @Test
+    void checkZeroDepart() {
+
+        final PriceDto price = getDefaultPriceDto();
+        price.setDepart(0);
+
+        InvalidPriceException e = assertThrows(InvalidPriceException.class,
+                                               () -> priceValidationService.validate(price));
+        assertEquals(InvalidPriceDepartException.class, e.getClass());
+    }
+
+    @Test
+    void checkNullBeginDate() {
+
+        final PriceDto price = getDefaultPriceDto();
+        price.setBegin(null);
+
+        InvalidPriceException e = assertThrows(InvalidPriceException.class,
+                                               () -> priceValidationService.validate(price));
+        assertEquals(InvalidPriceDateException.class, e.getClass());
+    }
+
+    @Test
+    void checkNullEndDate() {
+
+        final PriceDto price = getDefaultPriceDto();
+        price.setEnd(null);
+
+        InvalidPriceException e = assertThrows(InvalidPriceException.class,
+                                               () -> priceValidationService.validate(price));
+        assertEquals(InvalidPriceDateException.class, e.getClass());
+    }
+
+    @Test
+    void checkInvalidDatesOrder() {
+
+        final PriceDto price = getDefaultPriceDto();
+        final LocalDateTime tmp = price.getBegin();
+        price.setBegin(price.getEnd());
+        price.setEnd(tmp);
+
+        InvalidPriceException e = assertThrows(InvalidPriceException.class,
+                                               () -> priceValidationService.validate(price));
+        assertEquals(InvalidPriceDateException.class, e.getClass());
     }
 
 }
