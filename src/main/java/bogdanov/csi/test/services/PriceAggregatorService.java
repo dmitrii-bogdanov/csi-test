@@ -35,6 +35,9 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
     }
 
     private void validate(final List<PriceDto> prices) throws InvalidPriceException {
+        if (prices == null) {
+            throw new InvalidPriceException("List is null");
+        }
         for (final PriceDto price : prices) {
             priceValidationService.validate(price);
         }
