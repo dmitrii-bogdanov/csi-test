@@ -7,11 +7,13 @@ import bogdanov.csi.test.util.DateUtil;
 import bogdanov.csi.test.util.price.PricePlacement;
 import bogdanov.csi.test.services.validators.PriceValidationServiceInterface;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PriceAggregatorService implements PriceAggregatorServiceInterface {
@@ -96,13 +98,15 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         Iterator<PriceDto>       tmpIterator;
         PriceDto                 tmp;
         List<PriceDto>           cutPrices;
+        int size;
 
-        while (priceIterator.hasNext()) {
-            price = priceIterator.next();
+        for (int priceIndex = 0; priceIndex < prices.size(); priceIndex++) {
+            log.info("priceIndex: " + priceIndex + "; size: " + prices.size());
+            price = prices.get(priceIndex);
 
-            tmpIterator = (new ArrayList<>(prices)).iterator();
-            while (tmpIterator.hasNext()) {
-                tmp = tmpIterator.next();
+            for (int tmpIndex = 0; tmpIndex < prices.size(); tmpIndex++) {
+                log.info("tmpIndex: " + priceIndex + "; size: " + prices.size());
+                tmp = prices.get(tmpIndex);
 
                 if (price.equals(tmp)) {
                     continue;
@@ -144,18 +148,23 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         if (isCovered(currentPrice, newPrice)) {
             prices.remove(currentPrice);
         } else if (isCovered(newPrice, currentPrice)) {
-            currentPrice.setEnd(newPrice.getBegin());
 
             final PriceDto tmp = new PriceDto(currentPrice,
-                                              null,
-                                              newPrice.getEnd().plusSeconds(1),
-                                              currentPrice.getEnd());
+                    null,
+                    newPrice.getEnd().plusSeconds(1),
+                    currentPrice.getEnd());
+
+            currentPrice.setEnd(newPrice.getBegin().minusSeconds(1));
 
             prices.add(tmp);
         } else if (currentPrice.getBegin().isBefore(newPrice.getBegin())) {
             currentPrice.setEnd(newPrice.getBegin().minusSeconds(1));
         } else {
             currentPrice.setBegin(newPrice.getEnd().plusSeconds(1));
+        }
+
+        if (currentPrice.getBegin().isAfter(currentPrice.getEnd())) {
+            prices.remove(currentPrice);
         }
     }
 

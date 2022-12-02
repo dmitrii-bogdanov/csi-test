@@ -28,7 +28,7 @@ public class PriceValidationService implements PriceValidationServiceInterface {
     }
 
     private void checkId(final PriceDto price) throws InvalidPriceIdException {
-        if (price.getId() <= 0) {
+        if (price.getId() != null && price.getId() <= 0) {
             throw new InvalidPriceIdException("Id is not positive. Received: " + price.getId());
         }
     }

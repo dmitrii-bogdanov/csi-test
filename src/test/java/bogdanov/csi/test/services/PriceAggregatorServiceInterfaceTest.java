@@ -297,7 +297,7 @@ class PriceAggregatorServiceInterfaceTest extends PriceServiceTest{
         newPrice.setValue(newPrice.getValue() * 2);
         newPrice.setNew(true);
         newPrice.setBegin(LocalDateTime.of(2000, 6, 1, 0,0,0,0));
-        newPrice.setBegin(LocalDateTime.of(2000, 6, 30, 23,59,59,0));
+        newPrice.setEnd(LocalDateTime.of(2000, 6, 30, 23,59,59,0));
         newPrices.add(newPrice);
         newPrices.forEach(price -> log.info("new: " + price));
 

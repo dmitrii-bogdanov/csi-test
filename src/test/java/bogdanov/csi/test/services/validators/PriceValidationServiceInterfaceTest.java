@@ -47,6 +47,15 @@ class PriceValidationServiceInterfaceTest extends PriceServiceTest {
     }
 
     @Test
+    void checkNullId() {
+
+        final PriceDto price = getDefaultPriceDto();
+        price.setId(null);
+
+        assertDoesNotThrow(() -> priceValidationService.validate(price));
+    }
+
+    @Test
     void checkZeroId() {
 
         final PriceDto price = getDefaultPriceDto();
