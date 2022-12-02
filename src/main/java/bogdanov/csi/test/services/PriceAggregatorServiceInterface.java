@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
 public interface PriceAggregatorServiceInterface {
 
     List<PriceDto> aggregate(List<PriceDto> currentPrices, List<PriceDto> newPrices) throws InvalidPriceException;

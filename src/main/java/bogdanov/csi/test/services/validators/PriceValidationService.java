@@ -3,7 +3,9 @@ package bogdanov.csi.test.services.validators;
 import bogdanov.csi.test.dto.PriceDto;
 import bogdanov.csi.test.exceptions.price.*;
 import org.apache.logging.log4j.util.Strings;
+import org.springframework.stereotype.Service;
 
+@Service
 public class PriceValidationService implements PriceValidationServiceInterface {
 
     @Override

@@ -2,31 +2,22 @@ package bogdanov.csi.test.services.validators;
 
 import bogdanov.csi.test.dto.PriceDto;
 import bogdanov.csi.test.exceptions.price.*;
-import lombok.RequiredArgsConstructor;
+import bogdanov.csi.test.services.PriceServiceTest;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@RequiredArgsConstructor
-class PriceValidationServiceInterfaceTest {
+@Slf4j
+class PriceValidationServiceInterfaceTest extends PriceServiceTest {
 
-    private final PriceValidationServiceInterface priceValidationService;
-
-    private PriceDto getDefaultPriceDto() {
-        final PriceDto price = new PriceDto();
-        price.setId(1L);
-        price.setProductCode("P1");
-        price.setNumber(1);
-        price.setDepart(1);
-        price.setBegin(LocalDateTime.of(2000, 1,1,0,0,0,0));
-        price.setBegin(LocalDateTime.of(2000, 12,31,59,59,59,0));
-        price.setValue(1);
-
-        return price;
-    }
+    @Autowired
+    private PriceValidationServiceInterface priceValidationService;
 
     @Test
     void checkValidPrice() {
@@ -176,6 +167,17 @@ class PriceValidationServiceInterfaceTest {
         InvalidPriceException e = assertThrows(InvalidPriceException.class,
                                                () -> priceValidationService.validate(price));
         assertEquals(InvalidPriceDateException.class, e.getClass());
+    }
+
+    @Test
+    void checkNegativeValue() {
+
+        final PriceDto price = getDefaultPriceDto();
+        price.setValue(-1);
+
+        InvalidPriceException e = assertThrows(InvalidPriceException.class,
+                                               () -> priceValidationService.validate(price));
+        assertEquals(InvalidPriceValueException.class, e.getClass());
     }
 
 }

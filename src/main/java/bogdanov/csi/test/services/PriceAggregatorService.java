@@ -7,10 +7,12 @@ import bogdanov.csi.test.util.DateUtil;
 import bogdanov.csi.test.util.price.PricePlacement;
 import bogdanov.csi.test.services.validators.PriceValidationServiceInterface;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Service
 @RequiredArgsConstructor
 public class PriceAggregatorService implements PriceAggregatorServiceInterface {
 
@@ -60,10 +62,6 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         return combinedPrices;
     }
 
-    private void sortPrices(final List<PriceDto> prices) {
-        prices.sort(Comparator.comparing(PriceDto::getBegin));
-    }
-
     private Map<PricePlacement, List<PriceDto>> getPricesByPricePlacement(final List<PriceDto> prices) {
 
         final Map<PricePlacement, List<PriceDto>> pricesByPricePlacement = new HashMap<>();
@@ -102,7 +100,7 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         while (priceIterator.hasNext()) {
             price = priceIterator.next();
 
-            tmpIterator = prices.iterator();
+            tmpIterator = (new ArrayList<>(prices)).iterator();
             while (tmpIterator.hasNext()) {
                 tmp = tmpIterator.next();
 
@@ -164,6 +162,10 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
     private boolean isCovered(final PriceDto price1, final PriceDto price2) {
         return DateUtil.isInside(price1.getBegin(), price2.getBegin(), price2.getEnd())
                && DateUtil.isInside(price1.getEnd(), price2.getBegin(), price2.getEnd());
+    }
+
+    private void sortPrices(final List<PriceDto> prices) {
+        prices.sort(Comparator.comparing(PriceDto::getBegin));
     }
 
     /**
