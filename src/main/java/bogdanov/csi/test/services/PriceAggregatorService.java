@@ -38,16 +38,22 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         if (prices == null) {
             throw new InvalidPriceException("List is null");
         }
-        checkPricesAreNotIntersected(prices);
         for (final PriceDto price : prices) {
             priceValidationService.validate(price);
         }
     }
 
     private void checkPricesAreNotIntersected(final List<PriceDto> prices) throws IntersectedPricesException {
-        for (int i = 0; i < prices.size() - 1; i++) {
-            if (areIntersected(prices.get(i), prices.get(i + 1))) {
-                throw new IntersectedPricesException("Prices are intersected");
+        for (final PriceDto price : prices) {
+            for (final PriceDto nextPrice : prices) {
+
+                if (price.equals(nextPrice)) {
+                    continue;
+                }
+
+                if (areIntersected(price, nextPrice) && (price.isNew() == nextPrice.isNew())) {
+                    throw new IntersectedPricesException("Prices are intersected");
+                }
             }
         }
     }
@@ -78,11 +84,13 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         return pricesByPricePlacement;
     }
 
-    private List<PriceDto> aggregate(final Map<PricePlacement, List<PriceDto>> pricesByPricePlacement) {
+    private List<PriceDto> aggregate(final Map<PricePlacement, List<PriceDto>> pricesByPricePlacement)
+            throws IntersectedPricesException {
 
         final List<PriceDto> result = new ArrayList<>();
 
         for (final List<PriceDto> prices : pricesByPricePlacement.values()) {
+            checkPricesAreNotIntersected(prices);
             cutIntersectedPrices(prices);
             sortPrices(prices);
             combineSamePricesPeriods(prices);
@@ -93,19 +101,12 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
     }
 
     private void cutIntersectedPrices(final List<PriceDto> prices) {
-        final Iterator<PriceDto> priceIterator = prices.iterator();
-        PriceDto                 price;
-        Iterator<PriceDto>       tmpIterator;
-        PriceDto                 tmp;
-        List<PriceDto>           cutPrices;
-        int size;
-
+        PriceDto price;
+        PriceDto tmp;
         for (int priceIndex = 0; priceIndex < prices.size(); priceIndex++) {
-            log.info("priceIndex: " + priceIndex + "; size: " + prices.size());
             price = prices.get(priceIndex);
 
             for (int tmpIndex = 0; tmpIndex < prices.size(); tmpIndex++) {
-                log.info("tmpIndex: " + priceIndex + "; size: " + prices.size());
                 tmp = prices.get(tmpIndex);
 
                 if (price.equals(tmp)) {
@@ -177,12 +178,6 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         prices.sort(Comparator.comparing(PriceDto::getBegin));
     }
 
-    /**
-     * Объединяет цены внутри списка, если их значения равны
-     *
-     * @param prices
-     * @return
-     */
     private void combineSamePricesPeriods(final List<PriceDto> prices) {
 
         final Iterator<PriceDto> priceIterator = prices.iterator();
