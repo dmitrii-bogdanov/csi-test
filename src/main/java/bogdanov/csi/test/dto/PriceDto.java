@@ -24,5 +24,7 @@ public class PriceDto{
     private LocalDateTime end;
     /** значение цены в копейках */
     private long value;
+    /** является ли цена новой */
+    private boolean isNew;
 
 }
