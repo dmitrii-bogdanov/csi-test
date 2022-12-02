@@ -1,6 +1,7 @@
 package bogdanov.csi.test.services;
 
 import bogdanov.csi.test.dto.PriceDto;
+import bogdanov.csi.test.exceptions.price.IntersectedPricesException;
 import bogdanov.csi.test.exceptions.price.InvalidPriceException;
 import bogdanov.csi.test.util.DateUtil;
 import bogdanov.csi.test.util.price.PricePlacement;
@@ -22,40 +23,45 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         validate(currentPrices);
         validate(newPrices);
 
-        final Map<PricePlacement, List<PriceDto>> currentPricesByPricePlacement = getPricesByPricePlacement(
-                currentPrices);
-        final Map<PricePlacement, List<PriceDto>> newPricesByPricePlacement = getPricesByPricePlacement(newPrices);
+        final List<PriceDto> prices = combine(currentPrices, newPrices);
 
-//        sortPrices(currentPricesByPricePlacement);
-//        sortPrices(newPricesByPricePlacement);
+        final Map<PricePlacement, List<PriceDto>> pricesByPricePlacement = getPricesByPricePlacement(prices);
 
-        final List<PriceDto> aggregatedPrices = aggregate(currentPricesByPricePlacement, newPricesByPricePlacement);
-
-        return aggregatedPrices;
+        return aggregate(pricesByPricePlacement);
     }
 
     private void validate(final List<PriceDto> prices) throws InvalidPriceException {
         if (prices == null) {
             throw new InvalidPriceException("List is null");
         }
+        checkPricesAreNotIntersected(prices);
         for (final PriceDto price : prices) {
             priceValidationService.validate(price);
         }
     }
 
-
-    private void sortPrices(final Map<PricePlacement, List<PriceDto>> pricesByPricePlacement) {
-        PricePlacement pricePlacement;
-        List<PriceDto> prices;
-        for (final Map.Entry<PricePlacement, List<PriceDto>> entry : pricesByPricePlacement.entrySet()) {
-            pricePlacement = entry.getKey();
-            prices = entry.getValue();
-            pricesByPricePlacement.put(pricePlacement, sortPrices(prices));
+    private void checkPricesAreNotIntersected(final List<PriceDto> prices) throws IntersectedPricesException {
+        for (int i = 0; i < prices.size() - 1; i++) {
+            if (areIntersected(prices.get(i), prices.get(i + 1))) {
+                throw new IntersectedPricesException("Prices are intersected");
+            }
         }
     }
 
-    private List<PriceDto> sortPrices(final List<PriceDto> prices) {
-        return prices.stream().sorted().collect(Collectors.toList());
+    private List<PriceDto> combine(final List<PriceDto> currentPrices, final List<PriceDto> newPrices) {
+
+        final List<PriceDto> combinedPrices = new ArrayList<>();
+
+        combinedPrices.addAll(currentPrices);
+        combinedPrices.addAll(newPrices.stream()
+                                       .peek(price -> price.setNew(true))
+                                       .collect(Collectors.toList()));
+
+        return combinedPrices;
+    }
+
+    private void sortPrices(final List<PriceDto> prices) {
+        prices.sort(Comparator.comparing(PriceDto::getBegin));
     }
 
     private Map<PricePlacement, List<PriceDto>> getPricesByPricePlacement(final List<PriceDto> prices) {
@@ -72,161 +78,135 @@ public class PriceAggregatorService implements PriceAggregatorServiceInterface {
         return pricesByPricePlacement;
     }
 
-    private List<PriceDto> aggregate(final Map<PricePlacement, List<PriceDto>> currentPricesByPricePlacement,
-                                     final Map<PricePlacement, List<PriceDto>> newPricesByPricePlacement) {
+    private List<PriceDto> aggregate(final Map<PricePlacement, List<PriceDto>> pricesByPricePlacement) {
 
         final List<PriceDto> result = new ArrayList<>();
 
-        List<PriceDto> currentPrices;
-        List<PriceDto> newPrices;
-        List<PriceDto> aggregatedPrices;
-        for (final PricePlacement pricePlacement : newPricesByPricePlacement.keySet()) {
-            currentPrices = currentPricesByPricePlacement.get(pricePlacement);
-            newPrices = newPricesByPricePlacement.get(pricePlacement);
-            aggregatedPrices = new LinkedList<>();
-
-            if (currentPrices == null || currentPrices.isEmpty()) {
-                result.addAll(newPrices);
-                continue;
-            }
-
-            aggregatedPrices.addAll(currentPrices);
-
-            if (!newPrices.isEmpty()) {
-
-                for (final PriceDto newPrice : newPrices) {
-                    applyNewPrice(aggregatedPrices, newPrice);
-                }
-
-                aggregatedPrices = combineSamePricesPeriods(aggregatedPrices);
-            }
-
-            result.addAll(aggregatedPrices);
+        for (final List<PriceDto> prices : pricesByPricePlacement.values()) {
+            cutIntersectedPrices(prices);
+            sortPrices(prices);
+            combineSamePricesPeriods(prices);
+            result.addAll(prices);
         }
 
         return result;
     }
 
-    private void applyNewPrice(final List<PriceDto> prices, final PriceDto newPrice) {
+    private void cutIntersectedPrices(final List<PriceDto> prices) {
+        final Iterator<PriceDto> priceIterator = prices.iterator();
+        PriceDto                 price;
+        Iterator<PriceDto>       tmpIterator;
+        PriceDto                 tmp;
+        List<PriceDto>           cutPrices;
 
-        removeCoveredPrices(prices, newPrice);
-        final boolean hasExtendedCurrentPrice = extendSamePrices(prices, newPrice);
-        cutCrossedPrices(prices, newPrice);
-        if (!hasExtendedCurrentPrice) {
-            prices.add(newPrice);
+        while (priceIterator.hasNext()) {
+            price = priceIterator.next();
+
+            tmpIterator = prices.iterator();
+            while (tmpIterator.hasNext()) {
+                tmp = tmpIterator.next();
+
+                if (price.equals(tmp)) {
+                    continue;
+                }
+
+                if (!isOnlyOneNew(price, tmp)) {
+                    continue;
+                }
+
+                if (areIntersected(price, tmp)) {
+                    cutPeriods(price, tmp, prices);
+                }
+            }
+        }
+
+    }
+
+    private boolean areIntersected(final PriceDto price1, final PriceDto price2) {
+        return DateUtil.isInside(price1.getBegin(), price2.getBegin(), price2.getEnd())
+               || DateUtil.isInside(price1.getEnd(), price2.getBegin(), price2.getEnd())
+               || DateUtil.isInside(price2.getBegin(), price1.getBegin(), price1.getEnd())
+               || DateUtil.isInside(price2.getEnd(), price1.getBegin(), price1.getEnd());
+    }
+
+    private boolean isOnlyOneNew(final PriceDto price1, final PriceDto price2) {
+        return (price1.isNew() && !price2.isNew())
+               || (price2.isNew() && !price1.isNew());
+    }
+
+    private void cutPeriods(final PriceDto price1, final PriceDto price2, final List<PriceDto> prices) {
+
+        final PriceDto currentPrice = price1.isNew()
+                                      ? price2
+                                      : price1;
+        final PriceDto newPrice = price1.isNew()
+                                  ? price1
+                                  : price2;
+
+        if (isCovered(currentPrice, newPrice)) {
+            prices.remove(currentPrice);
+        } else if (isCovered(newPrice, currentPrice)) {
+            currentPrice.setEnd(newPrice.getBegin());
+
+            final PriceDto tmp = new PriceDto(currentPrice,
+                                              null,
+                                              newPrice.getEnd().plusSeconds(1),
+                                              currentPrice.getEnd());
+
+            prices.add(tmp);
+        } else if (currentPrice.getBegin().isBefore(newPrice.getBegin())) {
+            currentPrice.setEnd(newPrice.getBegin().minusSeconds(1));
+        } else {
+            currentPrice.setBegin(newPrice.getEnd().plusSeconds(1));
         }
     }
 
+    private boolean isCovered(final PriceDto price1, final PriceDto price2) {
+        return DateUtil.isInside(price1.getBegin(), price2.getBegin(), price2.getEnd())
+               && DateUtil.isInside(price1.getEnd(), price2.getBegin(), price2.getEnd());
+    }
+
     /**
-     * Удаляет текущие цены, которые полностью перекрываются новой ценой
+     * Объединяет цены внутри списка, если их значения равны
      *
-     * @param prices   - текущие цены
-     * @param newPrice - новая цена
+     * @param prices
      * @return
      */
-    private void removeCoveredPrices(final List<PriceDto> prices, final PriceDto newPrice) {
-        final Iterator<PriceDto> iterator = prices.iterator();
+    private void combineSamePricesPeriods(final List<PriceDto> prices) {
+
+        final Iterator<PriceDto> priceIterator = prices.iterator();
+        PriceDto                 prevPrice     = null;
         PriceDto                 price;
-        while (iterator.hasNext()) {
-            price = iterator.next();
-            if (isCurrentPriceCovered(price, newPrice)) {
-                iterator.remove();
+
+        while (priceIterator.hasNext()) {
+
+            if (prevPrice == null) {
+                prevPrice = priceIterator.next();
+                continue;
+            }
+
+            price = priceIterator.next();
+
+            if ((prevPrice.getValue() == price.getValue())
+                && arePeriodsExtendingEachOther(prevPrice, price)) {
+
+                extendPeriod(prevPrice, price);
+                priceIterator.remove();
+                prevPrice = null;
+            } else {
+                prevPrice = price;
             }
         }
     }
 
-    private boolean isCurrentPriceCovered(final PriceDto currentPrice, final PriceDto newPrice) {
-        return !currentPrice.getBegin().isBefore(newPrice.getBegin())
-               && !currentPrice.getEnd().isAfter(newPrice.getEnd());
-    }
-
-    /**
-     * Расширяет срок действия текущей цены,
-     * если период действия новой цены с тем же значением пересекается или дополняет период текущей
-     *
-     * @param prices   - текущие цены
-     * @param newPrice - новая цена
-     * @return true - если новая цена была использована для расширения текующей
-     */
-    private boolean extendSamePrices(final List<PriceDto> prices, final PriceDto newPrice) {
-        final Iterator<PriceDto> iterator                = prices.iterator();
-        boolean                  hasExtendedCurrentPrice = false;
-        PriceDto                 price;
-        while (iterator.hasNext()) {
-            price = iterator.next();
-            if (!price.equals(newPrice) && arePricesPeriodsExtended(price, newPrice)) {
-                hasExtendedCurrentPrice = true;
-                extendPeriod(price, newPrice);
-            }
-        }
-        return hasExtendedCurrentPrice;
+    private boolean arePeriodsExtendingEachOther(final PriceDto price1, final PriceDto price2) {
+        return !price1.getBegin().isAfter(price2.getEnd().plusSeconds(1))
+               || !price1.getEnd().isBefore(price2.getBegin().minusSeconds(1));
     }
 
     private void extendPeriod(final PriceDto price1, final PriceDto price2) {
         price1.setBegin(DateUtil.min(price1.getBegin(), price2.getBegin()));
         price1.setEnd(DateUtil.max(price1.getEnd(), price2.getEnd()));
-    }
-
-    private boolean arePricesPeriodsExtended(final PriceDto price1, final PriceDto price2) {
-        return price1.getValue() == price2.getValue()
-               && (
-                       !price1.getBegin().isAfter(price2.getEnd().plusSeconds(1))
-                       || !price1.getEnd().isBefore(price2.getBegin().minusSeconds(1))
-               );
-    }
-
-    /**
-     * Обрезает период действия текущей цены при пересечении с новой,
-     * значение которой отлично от текущей
-     *
-     * @param prices   - текущие цены
-     * @param newPrice - новая цена
-     * @return
-     */
-    private void cutCrossedPrices(final List<PriceDto> prices, final PriceDto newPrice) {
-        final Iterator<PriceDto> iterator = prices.iterator();
-        PriceDto                 price;
-        while (iterator.hasNext()) {
-            price = iterator.next();
-            if ((price.getValue() != newPrice.getValue())
-                && arePricesPeriodsCrossed(price, newPrice)) {
-                cutPeriod(price, newPrice);
-            }
-        }
-    }
-
-    private void cutPeriod(final PriceDto price, final PriceDto newPrice) {
-        if (price.getBegin().isAfter(newPrice.getBegin())) {
-            price.setBegin(newPrice.getEnd());
-        } else {
-            price.setEnd(newPrice.getBegin());
-        }
-    }
-
-    private boolean arePricesPeriodsCrossed(final PriceDto price1, final PriceDto price2) {
-        return !price1.getBegin().isBefore(price2.getBegin())
-               || !price1.getEnd().isBefore(price2.getBegin());
-    }
-
-    /**
-     * Объединяет цены внутри списка, если их значения равны
-     * @param prices
-     * @return
-     */
-    private List<PriceDto> combineSamePricesPeriods(final List<PriceDto> prices) {
-
-        final List<PriceDto> result      = new LinkedList<>(prices);
-        Iterator<PriceDto>   tmpIterator = result.iterator();
-        PriceDto             tmp;
-
-        while (tmpIterator.hasNext()) {
-            tmp = tmpIterator.next();
-            if (extendSamePrices(result, tmp)) {
-                tmpIterator.remove();
-            }
-        }
-
-        return result;
     }
 
 }
